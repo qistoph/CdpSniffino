@@ -121,6 +121,12 @@ void loop() {
           case 0x0006:
             handleCdpAsciiField(F("Platform: "), rbuf, rbufIndex, cdpFieldLength);
             break;
+          case 0x000a:
+            handleCdpNumField(F("Native VLAN: "), rbuf, rbufIndex, cdpFieldLength);
+            break;
+          case 0x000b:
+            handleCdpDuplex(rbuf, rbufIndex, cdpFieldLength);
+            break;
           default:
             Serial.print(F("Field "));
             printhex(cdpFieldType >> 8); printhex(cdpFieldType & 0xFF);
@@ -139,9 +145,22 @@ void loop() {
   }
 }
 
+
 void handleCdpAsciiField(const __FlashStringHelper * title, const byte a[], unsigned int offset, unsigned int length) {
   Serial.print(title);
   print_str(a, offset, length);
+  Serial.println();
+}
+
+void handleCdpNumField(const __FlashStringHelper * title, const byte a[], unsigned int offset, unsigned int length) {
+  unsigned long num = 0;
+  for(int i=0; i<length; ++i) {
+    num <<= 8;
+    num += a[offset + i];
+  }
+
+  Serial.print(title);
+  Serial.print(num, DEC);
   Serial.println();
 }
 
@@ -168,6 +187,15 @@ void handleCdpAddresses(const byte a[], unsigned int offset, unsigned int length
     print_ip(address, 0, 4);
   }
   Serial.println();
+}
+
+void handleCdpDuplex(const byte a[], unsigned int offset, unsigned int length) {
+  Serial.print(F("Duplex: "));
+  if(a[offset]) {
+    Serial.println(F("Full"));
+  } else {
+    Serial.println(F("Half"));
+  }
 }
 
 void print_str(const byte a[], unsigned int offset, unsigned int length) {
