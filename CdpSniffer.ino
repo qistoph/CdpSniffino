@@ -184,9 +184,9 @@ void print_ip(const byte a[], unsigned int offset, unsigned int length) {
 
 void print_mac(const byte a[], unsigned int offset, unsigned int length) {
   for(int i=offset; i<offset+length; ++i) {
+    if(i>offset) Serial.print(':');
     if(a[i] < 0x10) Serial.print('0');
     Serial.print(a[i], HEX);
-    Serial.print(':');
   }
 }
 
