@@ -100,6 +100,7 @@ void loop() {
         rbufIndex+=2;
         unsigned int cdpFieldLength = (rbuf[rbufIndex] << 8) | rbuf[rbufIndex+1];
         rbufIndex+=2;
+        cdpFieldLength -= 4;
         
         switch(cdpFieldType) {
           case 0x0001:
@@ -130,7 +131,7 @@ void loop() {
             //todo: other types
         }
         
-        rbufIndex += cdpFieldLength - 4;
+        rbufIndex += cdpFieldLength;
       }
       
       Serial.println();
