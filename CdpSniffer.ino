@@ -48,6 +48,14 @@ void loop() {
     unsigned int rbufIndex = 2;
     if(byte_array_contains(rbuf, rbufIndex, cdp_mac, sizeof(cdp_mac))) {
       rbufIndex += sizeof(cdp_mac);
+      
+      unsigned long secs = millis()/1000;
+      int min = secs / 60;
+      int sec = secs % 60;
+      Serial.print(min); Serial.print(':');
+      if(sec < 10) Serial.print('0');
+      Serial.print(sec);
+      Serial.println();
 
       Serial.print(F("CDP packet received from "));
       print_mac(rbuf, rbufIndex, 6);
