@@ -1,150 +1,191 @@
 #include <SPI.h>
 #include <Ethernet.h>
-#include <utility/w5100.h>
+#include <LiquidCrystal.h>
 
-SOCKET s; // the socket that will be openend in RAW mode
-byte rbuf[1500+14]; //receive buffer
-//byte sbuf[1500+14]; //send buffer
-int rbuflen; // length of data to receive
-//int sbuflen; // length of data to send
+#include "cdp_listener.h"
 
-byte cdp_mac[] = {0x01, 0x00, 0x0c, 0xcc, 0xcc, 0xcc};
-byte llc_bytes[] = {0xaa, 0xaa, 0x03, 0x00, 0x00, 0x0c, 0x20, 0x00};
+#define VERSION_STR "v0.1"
+
+#define LCD_INFO_NONE 0
+#define LCD_INFO_CDP_DATA 1
 
 #define printhex(n) {if((n)<0x10){Serial.print('0');}Serial.print((n),HEX);}
 
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+#define CHAR_SCROLLDOTS 1
+byte charScrollDots[8] = {
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b10101,
+  0b00000
+};
+
+#define CHAR_DELTA 2
+byte charDelta[8] = {
+  0b00000,
+  0b00000,
+  0b00100,
+  0b01010,
+  0b10001,
+  0b11111,
+  0b00000,
+  0b00000
+};
+
 void setup() {
+  // Init serial
   Serial.begin(115200);
-  Serial.println("Hello, initializing");
+  // Init LCD
+  lcd.begin(20, 2);
+  lcd.createChar(CHAR_SCROLLDOTS, charScrollDots);
+  lcd.createChar(CHAR_DELTA, charDelta);
   
-  // initialize the w5100 chip and open a RAW socket
-  W5100.init();
-  W5100.writeSnMR(s, SnMR::MACRAW);
-  W5100.execCmdSn(s, Sock_OPEN);
+  // Let user know we're initializing
+  Serial.println("Initializing");
   
+  lcd.print("CDP Sniffino "VERSION_STR);
+  lcd.setCursor(0, 1);
+  lcd.print("Initializing");
+  lcd.write(CHAR_SCROLLDOTS);
+  
+  cdp_listener_init();
+  cdp_packet_handler = cdp_handler;
+  
+  // Let user know we're done initializing
   Serial.println("Initialization done");
+  update_lcd();
 }
+
+volatile unsigned long last_cdp_received = 0;
+
+volatile unsigned int lcd_delta_t = 0;
+volatile unsigned int lcd_ttl = 0;
+
+volatile unsigned int lcd_display_type = LCD_INFO_NONE;
+volatile char* lcd_data_value;
 
 void loop() {
-  
-  // check if we have received something
-  rbuflen = W5100.getRXReceivedSize(s);
-//  
-  if(rbuflen>0) {
-    
-    W5100.recv_data_processing(s, rbuf, rbuflen);
-    W5100.execCmdSn(s, Sock_RECV);
-    
-//    Serial.print(F("Received "));
-//    Serial.println(rbuflen, DEC);
-    
-//    for(int i=0; i<rbuflen-2; ++i) {
-//      Serial.print(rbuf[i+2], HEX);
-//      Serial.print(' ');
-//      if(i%16==15) Serial.println();
-//    }
-//    Serial.println();
-  
-    unsigned int rbufIndex = 2;
-    if(byte_array_contains(rbuf, rbufIndex, cdp_mac, sizeof(cdp_mac))) {
-      rbufIndex += sizeof(cdp_mac);
-      
-      unsigned long secs = millis()/1000;
-      int min = secs / 60;
-      int sec = secs % 60;
-      Serial.print(min); Serial.print(':');
-      if(sec < 10) Serial.print('0');
-      Serial.print(sec);
-      Serial.println();
-
-      Serial.print(F("CDP packet received from "));
-      print_mac(rbuf, rbufIndex, 6);
-      Serial.println();
-      rbufIndex += 6;
-      
-      unsigned int packet_length = (rbuf[rbufIndex] << 8) | rbuf[rbufIndex+1];
-      rbufIndex+=2;
-      
-      if(packet_length != rbuflen - rbufIndex) {
-        Serial.println(F("Incomplete packet received"));
-        //todo: abort?
-      }
-      
-      // expecting LLC bytes
-      if(!byte_array_contains(rbuf, rbufIndex, llc_bytes, sizeof(llc_bytes))) {
-        Serial.println(F("Unexpected LLC packet"));
-      }
-      rbufIndex += sizeof(llc_bytes);
-      
-      int cdpVersion = rbuf[rbufIndex++];
-      Serial.print(F("Version: "));
-      Serial.println(cdpVersion);
-      if(cdpVersion != 0x02) {
-        Serial.print(F("This tool implements CDP version 2, not "));
-        Serial.println(cdpVersion);
-      }
-      
-      int cdpTtl = rbuf[rbufIndex++];
-      Serial.print(F("TTL: "));
-      Serial.println(cdpTtl);
-      
-      unsigned int cdpChecksum = (rbuf[rbufIndex] << 8) | rbuf[rbufIndex+1];
-      rbufIndex += 2;
-      Serial.print(F("Checksum: "));
-      printhex(cdpChecksum >> 8);
-      printhex(cdpChecksum & 0xFF);
-      Serial.println();
-      
-      while(rbufIndex < rbuflen) { // read all remaining TLV fields
-        unsigned int cdpFieldType = (rbuf[rbufIndex] << 8) | rbuf[rbufIndex+1];
-        rbufIndex+=2;
-        unsigned int cdpFieldLength = (rbuf[rbufIndex] << 8) | rbuf[rbufIndex+1];
-        rbufIndex+=2;
-        cdpFieldLength -= 4;
-        
-        switch(cdpFieldType) {
-          case 0x0001:
-            handleCdpAsciiField(F("Device ID: "), rbuf, rbufIndex, cdpFieldLength);
-            break;
-          case 0x00002:
-            handleCdpAddresses(rbuf, rbufIndex, cdpFieldLength);
-            break;
-          case 0x0003:
-            handleCdpAsciiField(F("Port ID: "), rbuf, rbufIndex, cdpFieldLength);
-            break;
-//          case 0x0004:
-//            handleCdpCapabilities(rbuf, rbufIndex, cdpFieldLength);
-//            break;
-          case 0x0005:
-            handleCdpAsciiField(F("Software Version: "), rbuf, rbufIndex, cdpFieldLength);
-            break;
-          case 0x0006:
-            handleCdpAsciiField(F("Platform: "), rbuf, rbufIndex, cdpFieldLength);
-            break;
-          case 0x000a:
-            handleCdpNumField(F("Native VLAN: "), rbuf, rbufIndex, cdpFieldLength);
-            break;
-          case 0x000b:
-            handleCdpDuplex(rbuf, rbufIndex, cdpFieldLength);
-            break;
-          default:
-            Serial.print(F("Field "));
-            printhex(cdpFieldType >> 8); printhex(cdpFieldType & 0xFF);
-            Serial.print(F(", Length: "));
-            Serial.print(cdpFieldLength, DEC);
-            Serial.println();
-            break;
-            //todo: other types
-        }
-        
-        rbufIndex += cdpFieldLength;
-      }
-      
-      Serial.println();
-    }
+  switch(cdp_listener_update()) {
+    case CDP_STATUS_OK: break;
+    case CDP_INCOMPLETE_PACKET: Serial.println(F("Incomplete packet received")); break;
+    case CDP_UNKNOWN_LLC: Serial.println(F("Unexpected LLC packet")); break;
   }
+  
+  lcd_delta_t = (millis() - last_cdp_received)/1000;
 }
 
+void update_lcd() {
+  unsigned int delta_t = lcd_delta_t;
+  unsigned int ttl = lcd_ttl;
+  
+  lcd.clear();
+  
+  lcd.write(CHAR_DELTA);
+  lcd.print(' ');
+  if(delta_t < 10) lcd.print(' ');
+  if(delta_t < 100) lcd.print(' ');
+  lcd.print(delta_t);
+  
+  lcd.print("   TTL: ");
+  if(ttl < 10) lcd.print(' ');
+  if(ttl < 100) lcd.print(' ');
+  lcd.print(ttl);
+
+  lcd.setCursor(0, 1);
+  switch(lcd_display_type) {
+    case LCD_INFO_NONE: break;
+    case LCD_INFO_CDP_DATA:
+      lcd.print((const char*)lcd_data_value);
+      break;
+  }
+  //TODO: print current item(s)
+}
+
+void cdp_handler(const byte cdpData[], size_t cdpDataIndex, size_t cdpDataLength, const byte macFrom[], size_t macLength) {
+    unsigned long secs = millis()/1000;
+    int min = secs / 60;
+    int sec = secs % 60;
+    Serial.print(min); Serial.print(':');
+    if(sec < 10) Serial.print('0');
+    Serial.print(sec);
+    Serial.println();
+    
+    Serial.print(F("CDP packet received from "));
+    print_mac(macFrom, 0, macLength);
+    Serial.println();
+
+    int cdpVersion = cdpData[cdpDataIndex++];
+    if(cdpVersion != 0x02) {
+      Serial.print(F("Version: "));
+      Serial.println(cdpVersion);
+    }
+    
+    int cdpTtl = cdpData[cdpDataIndex++];
+    Serial.print(F("TTL: "));
+    Serial.println(cdpTtl);
+    
+    lcd_ttl = cdpTtl;
+    
+    unsigned int cdpChecksum = (cdpData[cdpDataIndex] << 8) | cdpData[cdpDataIndex+1];
+    cdpDataIndex += 2;
+    Serial.print(F("Checksum: "));
+    printhex(cdpChecksum >> 8);
+    printhex(cdpChecksum & 0xFF);
+    Serial.println();
+    
+    while(cdpDataIndex < cdpDataLength) { // read all remaining TLV fields
+      unsigned int cdpFieldType = (cdpData[cdpDataIndex] << 8) | cdpData[cdpDataIndex+1];
+      cdpDataIndex+=2;
+      unsigned int cdpFieldLength = (cdpData[cdpDataIndex] << 8) | cdpData[cdpDataIndex+1];
+      cdpDataIndex+=2;
+      cdpFieldLength -= 4;
+      
+      switch(cdpFieldType) {
+        case 0x0001:
+          handleCdpAsciiField(F("Device ID: "), cdpData, cdpDataIndex, cdpFieldLength);
+          break;
+        case 0x00002:
+          handleCdpAddresses(cdpData, cdpDataIndex, cdpFieldLength);
+          break;
+        case 0x0003:
+          handleCdpAsciiField(F("Port ID: "), cdpData, cdpDataIndex, cdpFieldLength);
+          break;
+//          case 0x0004:
+//            handleCdpCapabilities(cdpData, cdpDataIndex, cdpFieldLength);
+//            break;
+        case 0x0005:
+          handleCdpAsciiField(F("Software Version: "), cdpData, cdpDataIndex, cdpFieldLength);
+          break;
+        case 0x0006:
+          handleCdpAsciiField(F("Platform: "), cdpData, cdpDataIndex, cdpFieldLength);
+          break;
+        case 0x000a:
+          handleCdpNumField(F("Native VLAN: "), cdpData, cdpDataIndex, cdpFieldLength);
+          break;
+        case 0x000b:
+          handleCdpDuplex(cdpData, cdpDataIndex, cdpFieldLength);
+          break;
+        default:
+          // TODO: raw field
+//            Serial.print(F("Field "));
+//            printhex(cdpFieldType >> 8); printhex(cdpFieldType & 0xFF);
+//            Serial.print(F(", Length: "));
+//            Serial.print(cdpFieldLength, DEC);
+//            Serial.println();
+          break;
+      }
+      
+      cdpDataIndex += cdpFieldLength;
+    }
+    
+    Serial.println();
+  
+}
 
 void handleCdpAsciiField(const __FlashStringHelper * title, const byte a[], unsigned int offset, unsigned int length) {
   Serial.print(title);
@@ -217,12 +258,4 @@ void print_mac(const byte a[], unsigned int offset, unsigned int length) {
     if(a[i] < 0x10) Serial.print('0');
     Serial.print(a[i], HEX);
   }
-}
-
-bool byte_array_contains(const byte a[], unsigned int offset, const byte b[], unsigned int length) {
-  for(int i=offset, j=0; j<length; ++i, ++j) {
-    if(a[i] != b[j]) return false;
-  }
-  
-  return true;
 }
