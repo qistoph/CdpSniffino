@@ -21,7 +21,7 @@ void cdp_listener_init() {
 CDP_STATUS cdp_listener_update() {
   // check if we have received something
   rbuflen = W5100.getRXReceivedSize(s);
-
+  
   if(rbuflen>0) {
     W5100.recv_data_processing(s, rbuf, rbuflen);
     W5100.execCmdSn(s, Sock_RECV);
@@ -45,7 +45,12 @@ CDP_STATUS cdp_listener_update() {
       
       unsigned int packet_length = (rbuf[rbufIndex] << 8) | rbuf[rbufIndex+1];
       rbufIndex+=2;
-      
+//      
+//      Serial.print(packet_length);
+//      Serial.print(F(" vs "));
+//      Serial.print(rbuflen);
+//      Serial.print(F(" - "));
+//      Serial.println(rbufIndex);
       if(packet_length != rbuflen - rbufIndex) {
         return CDP_INCOMPLETE_PACKET;
       }
@@ -61,6 +66,8 @@ CDP_STATUS cdp_listener_update() {
       }
     }
   }
+  
+  return CDP_STATUS_OK;
 }
 
 bool byte_array_contains(const byte a[], unsigned int offset, const byte b[], unsigned int length) {
