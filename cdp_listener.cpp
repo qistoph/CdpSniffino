@@ -64,7 +64,7 @@ CDP_STATUS cdp_listener_update() {
 }
 
 bool byte_array_contains(const byte a[], unsigned int offset, const byte b[], unsigned int length) {
-  for(int i=offset, j=0; j<length; ++i, ++j) {
+  for(unsigned int i=offset, j=0; j<length; ++i, ++j) {
     if(a[i] != b[j]) return false;
   }
   

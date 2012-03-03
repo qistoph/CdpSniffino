@@ -195,7 +195,7 @@ void handleCdpAsciiField(const __FlashStringHelper * title, const byte a[], unsi
 
 void handleCdpNumField(const __FlashStringHelper * title, const byte a[], unsigned int offset, unsigned int length) {
   unsigned long num = 0;
-  for(int i=0; i<length; ++i) {
+  for(unsigned int i=0; i<length; ++i) {
     num <<= 8;
     num += a[offset + i];
   }
@@ -240,20 +240,20 @@ void handleCdpDuplex(const byte a[], unsigned int offset, unsigned int length) {
 }
 
 void print_str(const byte a[], unsigned int offset, unsigned int length) {
-  for(int i=offset; i<offset+length; ++i) {
+  for(unsigned int i=offset; i<offset+length; ++i) {
     Serial.write(a[i]);
   }
 }
 
 void print_ip(const byte a[], unsigned int offset, unsigned int length) {
-  for(int i=offset; i<offset+length; ++i) {
+  for(unsigned int i=offset; i<offset+length; ++i) {
     if(i>offset) Serial.print('.');
     Serial.print(a[i], DEC);
   }
 }
 
 void print_mac(const byte a[], unsigned int offset, unsigned int length) {
-  for(int i=offset; i<offset+length; ++i) {
+  for(unsigned int i=offset; i<offset+length; ++i) {
     if(i>offset) Serial.print(':');
     if(a[i] < 0x10) Serial.print('0');
     Serial.print(a[i], HEX);
