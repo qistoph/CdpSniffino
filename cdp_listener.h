@@ -5,7 +5,7 @@
 
 #include <SPI.h>
 #include <Ethernet.h>
-#include <utility/w5100.h>
+#include <utility/w5100.h> // Uses Pin 11, 12, 13 on Duemilanove
 
 typedef uint8_t CDP_STATUS;
 #define CDP_STATUS_OK 0

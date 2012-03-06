@@ -2,9 +2,9 @@
 #include <Ethernet.h>
 #include <Wire.h>
 //#include <LiquidCrystal.h> /* Either use LiquidCrystal of LiquidCrystal_I2C
-#include <LiquidCrystal_I2C.h> //*/
+#include <LiquidCrystal_I2C.h> //*/ // Uses analog pins 4 and 5 on Duemilanove
 
-#include "cdp_listener.h"
+#include "cdp_listener.h" // Uses digital pins 11, 12, 13 on Duemilanove
 
 #define VERSION_STR "v0.1"
 
