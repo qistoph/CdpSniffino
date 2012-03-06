@@ -61,6 +61,8 @@ CDP_STATUS cdp_listener_update() {
       }
     }
   }
+  
+  return CDP_STATUS_OK;
 }
 
 bool byte_array_contains(const byte a[], unsigned int offset, const byte b[], unsigned int length) {
