@@ -1,73 +1,27 @@
 #include <SPI.h>
 #include <Ethernet.h>
-#include <LiquidCrystal.h>
 
 #include "cdp_listener.h"
 
 #define VERSION_STR "v0.1"
 
-#define LCD_INFO_NONE 0
-#define LCD_INFO_CDP_DATA 1
-
 #define printhex(n) {if((n)<0x10){Serial.print('0');}Serial.print((n),HEX);}
-
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
-
-#define CHAR_SCROLLDOTS 1
-byte charScrollDots[8] = {
-  0b00000,
-  0b00000,
-  0b00000,
-  0b00000,
-  0b00000,
-  0b00000,
-  0b10101,
-  0b00000
-};
-
-#define CHAR_DELTA 2
-byte charDelta[8] = {
-  0b00000,
-  0b00000,
-  0b00100,
-  0b01010,
-  0b10001,
-  0b11111,
-  0b00000,
-  0b00000
-};
 
 void setup() {
   // Init serial
   Serial.begin(115200);
-  // Init LCD
-  lcd.begin(20, 2);
-  lcd.createChar(CHAR_SCROLLDOTS, charScrollDots);
-  lcd.createChar(CHAR_DELTA, charDelta);
   
   // Let user know we're initializing
   Serial.println("Initializing");
-  
-  lcd.print("CDP Sniffino "VERSION_STR);
-  lcd.setCursor(0, 1);
-  lcd.print("Initializing");
-  lcd.write(CHAR_SCROLLDOTS);
   
   cdp_listener_init();
   cdp_packet_handler = cdp_handler;
   
   // Let user know we're done initializing
   Serial.println("Initialization done");
-  update_lcd();
 }
 
 volatile unsigned long last_cdp_received = 0;
-
-volatile unsigned int lcd_delta_t = 0;
-volatile unsigned int lcd_ttl = 0;
-
-volatile unsigned int lcd_display_type = LCD_INFO_NONE;
-volatile char* lcd_data_value;
 
 void loop() {
   switch(cdp_listener_update()) {
@@ -75,35 +29,6 @@ void loop() {
     case CDP_INCOMPLETE_PACKET: Serial.println(F("Incomplete packet received")); break;
     case CDP_UNKNOWN_LLC: Serial.println(F("Unexpected LLC packet")); break;
   }
-  
-  lcd_delta_t = (millis() - last_cdp_received)/1000;
-}
-
-void update_lcd() {
-  unsigned int delta_t = lcd_delta_t;
-  unsigned int ttl = lcd_ttl;
-  
-  lcd.clear();
-  
-  lcd.write(CHAR_DELTA);
-  lcd.print(' ');
-  if(delta_t < 10) lcd.print(' ');
-  if(delta_t < 100) lcd.print(' ');
-  lcd.print(delta_t);
-  
-  lcd.print("   TTL: ");
-  if(ttl < 10) lcd.print(' ');
-  if(ttl < 100) lcd.print(' ');
-  lcd.print(ttl);
-
-  lcd.setCursor(0, 1);
-  switch(lcd_display_type) {
-    case LCD_INFO_NONE: break;
-    case LCD_INFO_CDP_DATA:
-      lcd.print((const char*)lcd_data_value);
-      break;
-  }
-  //TODO: print current item(s)
 }
 
 void cdp_handler(const byte cdpData[], size_t cdpDataIndex, size_t cdpDataLength, const byte macFrom[], size_t macLength) {
@@ -128,8 +53,6 @@ void cdp_handler(const byte cdpData[], size_t cdpDataIndex, size_t cdpDataLength
     int cdpTtl = cdpData[cdpDataIndex++];
     Serial.print(F("TTL: "));
     Serial.println(cdpTtl);
-    
-    lcd_ttl = cdpTtl;
     
     unsigned int cdpChecksum = (cdpData[cdpDataIndex] << 8) | cdpData[cdpDataIndex+1];
     cdpDataIndex += 2;
