@@ -4,6 +4,7 @@
 #include <LiquidCrystal.h>
 
 #include "cdp_listener.h" // Uses digital pins 11, 12, 13 on Duemilanove
+#include "lcd_info.h"
 
 #define VERSION_STR "v0.1"
 
@@ -65,6 +66,7 @@ void setup() {
 }
 
 volatile unsigned long last_cdp_received = 0;
+volatile unsigned long cdp_packets_received = 0;
 
 volatile unsigned int lcd_delta_t = 0;
 volatile unsigned int lcd_ttl = 0;
@@ -92,6 +94,9 @@ void loop() {
   }
 }
 
+// TODO: move parts of this code to lcd_info
+unsigned int offset = 0;
+
 void update_lcd() {
   unsigned int delta_t = lcd_delta_t;
   unsigned int ttl = lcd_ttl;
@@ -99,24 +104,53 @@ void update_lcd() {
   lcd.setCursor(0, 0);
   
   lcd.write(CHAR_DELTA);
-  lcd.print(' ');
+  //lcd.print("t ");
   if(delta_t < 10) lcd.print(' ');
   if(delta_t < 100) lcd.print(' ');
   lcd.print(delta_t);
   
-  lcd.print("   TTL: ");
+  lcd.print("/");
   if(ttl < 10) lcd.print(' ');
   if(ttl < 100) lcd.print(' ');
   lcd.print(ttl);
+  
+  lcd.print(" @ ");
+  lcd.print(cdp_packets_received);
+  if(cdp_packets_received < 10) lcd.print(' ');
+  if(cdp_packets_received < 100) lcd.print(' ');
 
   lcd.setCursor(0, 1);
-  lcd.print(F("Running "));
-  lcd.print(millis()/1000);
-  lcd.print(F(" s"));
+  menu_item* curr = &menu[menu_current];
+  char lcd_data[21]; // 20 + \0
+
+  if(curr != NULL && curr->visible) {
+    unsigned int i;
+    size_t label_length = strlen(curr->label);
+    strncpy(lcd_data, curr->label, 20);
+    i = label_length;
+    lcd_data[i++] = ':';
+    lcd_data[i++] = ' ';
+
+    if(offset > 0) lcd_data[i++] = CHAR_SCROLLDOTS;
+    size_t value_length = strlen(curr->value);
+    if((value_length - offset) > (20 - i)) {
+      value_length = 20 - i - 1;
+      lcd_data[19] = CHAR_SCROLLDOTS;
+    }
+    strncpy(&lcd_data[i], &curr->value[offset], value_length);
+  } else {
+    unsigned int i;
+    for(i=0; i<20; ++i) lcd_data[i] = ' ';
+  }
+
+  lcd_data[20] = '\0';
+  lcd.print(lcd_data);
+//  printf("|%s|\n", lcd_data);
 }
 
 void cdp_handler(const byte cdpData[], size_t cdpDataIndex, size_t cdpDataLength, const byte macFrom[], size_t macLength) {
   last_cdp_received = millis();
+  cdp_packets_received++;
   
   unsigned long secs = millis()/1000;
   int min = secs / 60;
@@ -262,10 +296,43 @@ void print_ip(const byte a[], unsigned int offset, unsigned int length) {
   }
 }
 
+char value_mac_buffer[6*2 + 2 + 1]; // 6 bytes * 2 chars + 2 * : + 1 * \0
+
 void print_mac(const byte a[], unsigned int offset, unsigned int length) {
+  unsigned int n = 0;
   for(unsigned int i=offset; i<offset+length; ++i) {
-    if(i>offset) Serial.print(':');
+    if(i>offset && i%2==0) {
+      Serial.print(':');
+      value_mac_buffer[n++] = ':';
+    }
     if(a[i] < 0x10) Serial.print('0');
     Serial.print(a[i], HEX);
+    
+    value_mac_buffer[n++] = val2hex(a[i] >> 4);
+    value_mac_buffer[n++] = val2hex(a[i] & 0xf);
+  }
+  
+  value_mac_buffer[n++] = '\0';
+  set_menu(LABEL_MAC, value_mac_buffer);
+}
+
+char val2hex(byte b) {
+  switch(b) {
+    case 0x0: return '0';
+    case 0x1: return '1';
+    case 0x2: return '2';
+    case 0x3: return '3';
+    case 0x4: return '4';
+    case 0x5: return '5';
+    case 0x6: return '6';
+    case 0x7: return '7';
+    case 0x8: return '8';
+    case 0x9: return '9';
+    case 0xA: return 'A';
+    case 0xB: return 'B';
+    case 0xC: return 'C';
+    case 0xD: return 'D';
+    case 0xE: return 'E';
+    case 0xF: return 'F';
   }
 }
