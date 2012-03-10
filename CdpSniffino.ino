@@ -1,21 +1,18 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <Wire.h>
-//#include <LiquidCrystal.h> /* Either use LiquidCrystal of LiquidCrystal_I2C
-#include <LiquidCrystal_I2C.h> //*/ // Uses analog pins 4 and 5 on Duemilanove
+#include <LiquidCrystal.h>
 
 #include "cdp_listener.h" // Uses digital pins 11, 12, 13 on Duemilanove
 
 #define VERSION_STR "v0.1"
 
-#define LCD_INFO_NONE 0
-#define LCD_INFO_CDP_DATA 1
-
 #define printhex(n) {if((n)<0x10){Serial.print('0');}Serial.print((n),HEX);}
 
-// Depending on LiquidCrystal or LiquidCrystal_I2C
-//LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
-LiquidCrystal_I2C lcd(0x27, 20, 2, MCP23008);
+// Configure your LCD pins here
+// For instructions see http://arduino.cc/en/Tutorial/LiquidCrystal
+// and http://arduino.cc/en/Reference/LiquidCrystal
+LiquidCrystal lcd(8, 7, 6, 5, 4, 3, 2);
 
 #define CHAR_SCROLLDOTS 1
 byte charScrollDots[8] = {
@@ -45,18 +42,17 @@ void setup() {
   // Init serial
   Serial.begin(115200);
   // Init LCD
-  lcd.init();
-  lcd.backlight();
   lcd.begin(20, 2);
   
   // Let user know we're initializing
   Serial.println(F("Initializing"));
   
+  lcd.createChar(CHAR_SCROLLDOTS, charScrollDots);
+  lcd.createChar(CHAR_DELTA, charDelta);
+  
   lcd.print("CDP Sniffino "VERSION_STR);
   lcd.setCursor(0, 1);
   lcd.print("Initializing");
-  lcd.createChar(CHAR_SCROLLDOTS, charScrollDots);
-  lcd.createChar(CHAR_DELTA, charDelta);
   lcd.write(CHAR_SCROLLDOTS);
   
   cdp_listener_init();
@@ -73,10 +69,8 @@ volatile unsigned long last_cdp_received = 0;
 volatile unsigned int lcd_delta_t = 0;
 volatile unsigned int lcd_ttl = 0;
 
-volatile unsigned int lcd_display_type = LCD_INFO_NONE;
-volatile char* lcd_data_value;
-
 unsigned long last_lcd_update = 0;
+unsigned long last_serial_ping = 0;
 
 void loop() {
   switch(cdp_listener_update()) {
@@ -90,6 +84,11 @@ void loop() {
   if(millis() > last_lcd_update + 500) {
     update_lcd();
     last_lcd_update = millis();
+  }
+  
+  if(millis() > last_serial_ping + 2000) {
+    Serial.println(lcd_delta_t);
+    last_serial_ping = millis();
   }
 }
 
@@ -111,13 +110,9 @@ void update_lcd() {
   lcd.print(ttl);
 
   lcd.setCursor(0, 1);
-  switch(lcd_display_type) {
-    case LCD_INFO_NONE: break;
-    case LCD_INFO_CDP_DATA:
-      lcd.print((const char*)lcd_data_value);
-      break;
-  }
-  //TODO: print current item(s)
+  lcd.print(F("Running "));
+  lcd.print(millis()/1000);
+  lcd.print(F(" s"));
 }
 
 void cdp_handler(const byte cdpData[], size_t cdpDataIndex, size_t cdpDataLength, const byte macFrom[], size_t macLength) {
