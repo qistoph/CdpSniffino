@@ -56,6 +56,12 @@ size_t menu_size = sizeof(menu)/sizeof(*menu);
 unsigned int menu_current = 0;
 unsigned int lcd_more_offset = 0;
 
+volatile unsigned long last_cdp_received = 0;
+volatile unsigned long cdp_packets_received = 0;
+
+volatile unsigned int lcd_delta_t = 0;
+volatile unsigned int lcd_ttl = 0;
+
 void set_menu(label_type type, const char* value) {
   unsigned int i;
   for(i=0; i<menu_size; ++i) {

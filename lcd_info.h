@@ -32,6 +32,12 @@ extern size_t menu_size;
 extern unsigned int menu_current;
 extern unsigned int lcd_more_offset;
 
+extern volatile unsigned long last_cdp_received;
+extern volatile unsigned long cdp_packets_received;
+
+extern volatile unsigned int lcd_delta_t;
+extern volatile unsigned int lcd_ttl;
+
 void set_menu(label_type type, const char* value);
 void lcd_info_next();
 void lcd_info_more();
