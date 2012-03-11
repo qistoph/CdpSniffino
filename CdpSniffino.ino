@@ -4,10 +4,10 @@
 #include <LiquidCrystal.h>
 #include <DebounceButton.h>
 
+#define VERSION_STR "v0.1"
+
 #include "cdp_listener.h" // Uses digital pins 11, 12, 13 on Duemilanove
 #include "lcd_info.h"
-
-#define VERSION_STR "v0.1"
 
 #define printhex(n) {if((n)<0x10){Serial.print('0');}Serial.print((n),HEX);}
 
@@ -18,6 +18,9 @@ LiquidCrystal lcd(8, 7, 6, 5, 4, 3, 2);
 
 DebounceButton btnNext(9, DBTN_PULLUP_INTERNAL, 50, 800, 400); // 50 ms debounce, 0.8 sec before hold interval, 400 ms hold events
 DebounceButton btnMore(10, DBTN_PULLUP_INTERNAL, 50, 800, 400); // 50 ms debounce, 0.8 sec before hold interval, 400 ms hold events
+
+// The (optional) backlight control is on analog 0, which is addressed digtal as pin 14
+#define BACKLIGHT_PIN 14
 
 #define CHAR_SCROLLDOTS 1
 byte charScrollDots[8] = {
@@ -64,6 +67,9 @@ void setup() {
   lcd.setCursor(0, 1);
   lcd.print("Initializing");
   lcd.write(CHAR_SCROLLDOTS);
+  
+  pinMode(BACKLIGHT_PIN, OUTPUT);
+  digitalWrite(BACKLIGHT_PIN, HIGH); // backlight on
   
   cdp_listener_init();
   cdp_packet_handler = cdp_handler;
