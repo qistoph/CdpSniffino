@@ -30,7 +30,10 @@ extern menu_item menu[];
 
 extern size_t menu_size;
 extern unsigned int menu_current;
+extern unsigned int lcd_more_offset;
 
 void set_menu(label_type type, const char* value);
+void lcd_info_next();
+void lcd_info_more();
 
 #endif
