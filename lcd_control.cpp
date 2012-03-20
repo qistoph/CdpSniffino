@@ -79,6 +79,8 @@ void lcd_control_update() {
     if((value_length - lcd_more_offset) > (20 - i)) {
       value_length = 20 - i - 1;
       lcd_data[19] = LCD_CHAR_SCROLLDOTS;
+    } else {
+      value_length -= lcd_more_offset;
     }
     strncpy(&lcd_data[i], &curr->value[lcd_more_offset], value_length);
   } else {

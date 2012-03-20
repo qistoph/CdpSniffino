@@ -7,12 +7,10 @@
 #include "cdp_listener.h" // Uses digital pins 11, 12, 13 on Duemilanove
 #include "lcd_control.h"
 #include "lcd_info.h"
-
-#define printhex(n) {if((n)<0x10){Serial.print('0');}Serial.print((n),HEX);}
+#include "helpers.h"
 
 DebounceButton btnNext(PIN_BUTTON_NEXT, DBTN_PULLUP_INTERNAL, 50, 800, 400); // 50 ms debounce, 0.8 sec before hold interval, 400 ms hold events
 DebounceButton btnMore(PIN_BUTTON_MORE, DBTN_PULLUP_INTERNAL, 50, 800, 400); // 50 ms debounce, 0.8 sec before hold interval, 400 ms hold events
-
 
 void setup() {
   // Init serial
@@ -79,10 +77,16 @@ void btnMore_hold(DebounceButton* btn) {
 }
 
 
+#define printhex(n) {if((n)<0x10){Serial.print('0');}Serial.print((n),HEX);}
+
 char value_mac_buffer[6*2 + 2 + 1]; // 6 bytes * 2 chars + 2 * : + 1 * \0
 char value_ip_buffer[4*3 + 3 + 1]; // 3*4 chars  + 3 * . + 1 * \0
 char value_devid_buffer[20 + 1]; // 20 chars + \0
 char value_port_buffer[20 + 1]; // 20 chars + \0
+char value_software_buffer[20 + 1]; // 20 chars + \0
+char value_platform_buffer[40 + 1]; // 40 chars + \0
+char value_vlan_buffer[4 + 1]; // 4 chars + \0
+char value_duplex_buffer[4 + 1]; // 4 chars + \0 (half/full)
 
 void cdp_handler(const byte cdpData[], size_t cdpDataIndex, size_t cdpDataLength, const byte macFrom[], size_t macLength) {
   last_cdp_received = millis();
@@ -133,7 +137,8 @@ void cdp_handler(const byte cdpData[], size_t cdpDataIndex, size_t cdpDataLength
         set_menu(LABEL_DEVICE_ID, value_devid_buffer);
         break;
       case 0x00002:
-        handleCdpAddresses(cdpData, cdpDataIndex, cdpFieldLength);
+        handleCdpAddresses(cdpData, cdpDataIndex, cdpFieldLength, value_ip_buffer, sizeof(value_ip_buffer));
+        set_menu(LABEL_ADDRESS, value_ip_buffer);
         break;
       case 0x0003:
         handleCdpAsciiField(F("Port ID: "), cdpData, cdpDataIndex, cdpFieldLength, value_port_buffer, sizeof(value_port_buffer));
@@ -143,16 +148,20 @@ void cdp_handler(const byte cdpData[], size_t cdpDataIndex, size_t cdpDataLength
 //            handleCdpCapabilities(cdpData, cdpDataIndex, cdpFieldLength);
 //            break;
       case 0x0005:
-        //handleCdpAsciiField(F("Software Version: "), cdpData, cdpDataIndex, cdpFieldLength);
+        handleCdpAsciiField(F("Software Version: "), cdpData, cdpDataIndex, cdpFieldLength, value_software_buffer, sizeof(value_software_buffer));
+        set_menu(LABEL_SOFTWARE, value_software_buffer);
         break;
       case 0x0006:
-        //handleCdpAsciiField(F("Platform: "), cdpData, cdpDataIndex, cdpFieldLength);
+        handleCdpAsciiField(F("Platform: "), cdpData, cdpDataIndex, cdpFieldLength, value_platform_buffer, sizeof(value_platform_buffer));
+        set_menu(LABEL_PLATFORM, value_platform_buffer);
         break;
       case 0x000a:
-        handleCdpNumField(F("Native VLAN: "), cdpData, cdpDataIndex, cdpFieldLength);
+        handleCdpNumField(F("Native VLAN: "), cdpData, cdpDataIndex, cdpFieldLength, value_vlan_buffer, sizeof(value_vlan_buffer));
+        set_menu(LABEL_NATIVE_VLAN, value_vlan_buffer);
         break;
       case 0x000b:
-        handleCdpDuplex(cdpData, cdpDataIndex, cdpFieldLength);
+        handleCdpDuplex(cdpData, cdpDataIndex, cdpFieldLength, value_duplex_buffer, sizeof(value_duplex_buffer));
+        set_menu(LABEL_DUPLEX, value_duplex_buffer);
         break;
       default:
         // TODO: raw field
@@ -185,7 +194,7 @@ void set_mac(const byte a[], unsigned int offset, unsigned int length) {
 
 void handleCdpAsciiField(const __FlashStringHelper * title, const byte a[], unsigned int offset, unsigned int length, char* buffer, size_t buffer_size) {
   unsigned int i;
-  for(i=0; i<length && i<buffer_size; ++i) {
+  for(i=0; i<length && i<(buffer_size-1); ++i) {
     buffer[i] = a[offset + i];
   }
   buffer[i] = '\0';
@@ -195,7 +204,7 @@ void handleCdpAsciiField(const __FlashStringHelper * title, const byte a[], unsi
   Serial.println();
 }
 
-void handleCdpNumField(const __FlashStringHelper * title, const byte a[], unsigned int offset, unsigned int length) {
+void handleCdpNumField(const __FlashStringHelper * title, const byte a[], unsigned int offset, unsigned int length, char* buffer, size_t buffer_size) {
   unsigned long num = 0;
   for(unsigned int i=0; i<length; ++i) {
     num <<= 8;
@@ -205,9 +214,11 @@ void handleCdpNumField(const __FlashStringHelper * title, const byte a[], unsign
   Serial.print(title);
   Serial.print(num, DEC);
   Serial.println();
+  
+  snprintnum(buffer, buffer_size, num, 10);
 }
 
-void handleCdpAddresses(const byte a[], unsigned int offset, unsigned int length) {
+void handleCdpAddresses(const byte a[], unsigned int offset, unsigned int length, char* buffer, size_t buffer_size) {
   Serial.println(F("Addresses: "));
   unsigned int n = 0;
   unsigned long numOfAddrs = (a[offset] << 24) | (a[offset+1] << 16) | (a[offset+2] << 8) | a[offset+3];
@@ -229,28 +240,30 @@ void handleCdpAddresses(const byte a[], unsigned int offset, unsigned int length
     for(unsigned int j=0; j<addressLength; ++j) {
       address[j] = a[offset++];
       
-      if(j>0) value_ip_buffer[n++] = '.';
-      if(address[j] >= 100) value_ip_buffer[n++] = val2dec(address[j] / 100);
-      if(address[j] >= 10) value_ip_buffer[n++] = val2dec((address[j] / 10) % 10);
-      value_ip_buffer[n++] = val2dec(address[j] % 10);
+      if(n < buffer_size) if(j>0) buffer[n++] = '.';
+      if(n < buffer_size) if(address[j] >= 100) buffer[n++] = val2dec(address[j] / 100);
+      if(n < buffer_size) if(address[j] >= 10) buffer[n++] = val2dec((address[j] / 10) % 10);
+      if(n < buffer_size) buffer[n++] = val2dec(address[j] % 10);
     }
   
     Serial.print("- ");
     print_ip(address, 0, 4);
   }
   
-  value_ip_buffer[n++] = '\0';
-  set_menu(LABEL_ADDRESS, value_ip_buffer);
+  if(n >= buffer_size-1) n = buffer_size - 1;
+  buffer[n++] = '\0';
     
   Serial.println();
 }
 
-void handleCdpDuplex(const byte a[], unsigned int offset, unsigned int length) {
+void handleCdpDuplex(const byte a[], unsigned int offset, unsigned int length, char* buffer, size_t buffer_size) {
   Serial.print(F("Duplex: "));
   if(a[offset]) {
     Serial.println(F("Full"));
+    strncpy_P(buffer, PSTR("Full"), buffer_size - 1);
   } else {
     Serial.println(F("Half"));
+    strncpy_P(buffer, PSTR("Half"), buffer_size - 1);
   }
 }
 
