@@ -12,6 +12,7 @@ typedef enum {
     LABEL_PLATFORM,
     LABEL_NATIVE_VLAN,
     LABEL_DUPLEX,
+    LABEL_CONTRAST
 } label_type;
 
 #define INVISIBLE 0

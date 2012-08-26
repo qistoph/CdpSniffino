@@ -48,6 +48,12 @@ menu_item menu[] = {
     "Duplex",
     NULL,
     INVISIBLE
+  },
+  {
+    LABEL_CONTRAST,
+    "Contrast",
+    NULL,
+    INVISIBLE
   }
 };
 
@@ -87,8 +93,10 @@ void lcd_info_next() {
 }
 
 void lcd_info_more() {
+  // If first offset add an extra offset to scroll even though prefixing with a char
   if(lcd_more_offset == 0)
-    lcd_more_offset = 2;
-  else if(++lcd_more_offset > strlen(menu[menu_current].value))
+    lcd_more_offset = 1;
+
+  if(++lcd_more_offset > strlen(menu[menu_current].value))
     lcd_more_offset = 0;
 }

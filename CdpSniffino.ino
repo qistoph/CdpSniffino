@@ -10,8 +10,8 @@
 #include "lcd_info.h"
 #include "helpers.h"
 
-DebounceButton btnNext(PIN_BUTTON_NEXT, DBTN_PULLUP_INTERNAL, 50, 800, 400); // 50 ms debounce, 0.8 sec before hold interval, 400 ms hold events
-DebounceButton btnMore(PIN_BUTTON_MORE, DBTN_PULLUP_INTERNAL, 50, 800, 400); // 50 ms debounce, 0.8 sec before hold interval, 400 ms hold events
+DebounceButton btnNext(PIN_BUTTON_NEXT, DBTN_PULLUP_INTERNAL, 50, 600, 300); // 50 ms debounce, 0.6 sec before hold interval, 300 ms hold events
+DebounceButton btnMore(PIN_BUTTON_MORE, DBTN_PULLUP_INTERNAL, 50, 600, 300); // 50 ms debounce, 0.6 sec before hold interval, 300 ms hold events
 
 void setup() {
   // Init serial
@@ -23,12 +23,14 @@ void setup() {
   Serial.println(F("Initializing"));
   
   btnNext.onPress = btnNext_press;
-  btnNext.onHold = btnNext_hold;
+  btnNext.onHold = btnNext_press;
   btnMore.onPress = btnMore_press;
-  btnMore.onHold = btnMore_hold;
+  btnMore.onHold = btnMore_press;
   
   cdp_listener_init();
   cdp_packet_handler = cdp_handler;
+  
+  set_menu(LABEL_CONTRAST, "127");
   
   // Let user know we're done initializing
   Serial.println(F("Initialization done"));
@@ -65,18 +67,27 @@ void btnNext_press(DebounceButton* btn) {
   lcd_info_next();
 }
 
-void btnNext_hold(DebounceButton* btn) {
-  lcd_info_next();
-}
-
 void btnMore_press(DebounceButton* btn) {
-  lcd_info_more();
+  if(menu[menu_current].type == LABEL_CONTRAST) {
+    contrast_inc();
+  } else {
+    lcd_info_more();
+  }
 }
 
-void btnMore_hold(DebounceButton* btn) {
-  lcd_info_more();
+uint8_t contrast = 128;
+char value_contrast_buffer[3 + 1]; // 3 chars + \0
+void contrast_inc() {
+  if(contrast == 240)
+    contrast = 255;
+  else if(contrast == 255)
+    contrast = 0;
+  else
+    contrast += 16;
+  sprintf(value_contrast_buffer, "%d", contrast);
+  set_menu(LABEL_CONTRAST, value_contrast_buffer);
+  display.setContrast(contrast);
 }
-
 
 #define printhex(n) {if((n)<0x10){Serial.print('0');}Serial.print((n),HEX);}
 
