@@ -3,7 +3,7 @@
 void (*cdp_packet_handler)(const byte* cdpData, size_t cdpDataIndex, size_t cdpDataLength, const byte* macFrom, size_t macLength);
 
 SOCKET s; // the socket that will be openend in RAW mode
-byte rbuf[500+14]; //receive buffer (was 1500+14, but costs way to much SRAM)
+byte rbuf[500+14]; //receive buffer (was 1500+14, but costs way too much SRAM)
 int rbuflen; // length of data to receive
 
 #define MAC_LENGTH 6
@@ -23,6 +23,8 @@ CDP_STATUS cdp_listener_update() {
   rbuflen = W5100.getRXReceivedSize(s);
   
   if(rbuflen>0) {
+    if(rbuflen > sizeof(rbuf))
+      rbuflen = sizeof(rbuf);
     W5100.recv_data_processing(s, rbuf, rbuflen);
     W5100.execCmdSn(s, Sock_RECV);
     

@@ -2,22 +2,19 @@
 #define _LCD_CONTROL_H_
 
 #include <Arduino.h>
-#include <LiquidCrystal.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include "pins.h"
 #include "lcd_info.h"
 
-#define LCD_COLS 20
-#define LCD_ROWS 2
-
 /////////////////////////
 
-#define LCD_CHAR_SCROLLDOTS 1
-#define LCD_CHAR_DELTA 2
+#define LCD_CHAR_MORE_LEFT 0xae
+#define LCD_CHAR_MORE_RIGHT 0xaf
+#define LCD_CHAR_DELTA 0x7f
 
-// Configure your LCD pins here
-// For instructions see http://arduino.cc/en/Tutorial/LiquidCrystal
-// and http://arduino.cc/en/Reference/LiquidCrystal
-extern LiquidCrystal lcd;
+extern Adafruit_SSD1306 display;
 
 void lcd_control_init();
 void lcd_control_update();

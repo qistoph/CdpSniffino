@@ -87,6 +87,8 @@ void lcd_info_next() {
 }
 
 void lcd_info_more() {
-  if(++lcd_more_offset > strlen(menu[menu_current].value))
+  if(lcd_more_offset == 0)
+    lcd_more_offset = 2;
+  else if(++lcd_more_offset > strlen(menu[menu_current].value))
     lcd_more_offset = 0;
 }

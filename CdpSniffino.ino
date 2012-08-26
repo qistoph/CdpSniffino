@@ -1,8 +1,9 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <Wire.h>
-#include <LiquidCrystal.h>
 #include <DebounceButton.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 #include "cdp_listener.h" // Uses digital pins 11, 12, 13 on Duemilanove
 #include "lcd_control.h"
@@ -31,7 +32,7 @@ void setup() {
   
   // Let user know we're done initializing
   Serial.println(F("Initialization done"));
-  lcd.clear();
+
   lcd_control_update();
 }
 
