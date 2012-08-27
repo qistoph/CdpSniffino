@@ -30,10 +30,12 @@ void setup() {
   cdp_listener_init();
   cdp_packet_handler = cdp_handler;
   
-  set_menu(LABEL_CONTRAST, "127");
+  // Update the contrast information by incrementing contrast once
+  contrast_inc();
   
   // Let user know we're done initializing
   Serial.println(F("Initialization done"));
+  delay(500);
 
   lcd_control_update();
 }
@@ -75,18 +77,27 @@ void btnMore_press(DebounceButton* btn) {
   }
 }
 
-uint8_t contrast = 128;
-char value_contrast_buffer[3 + 1]; // 3 chars + \0
+#define CONTRAST_BLOCKS (6)
+uint8_t contrast = 0;
+char value_contrast_buffer[CONTRAST_BLOCKS + 1]; // 6 chars + \0
 void contrast_inc() {
-  if(contrast == 240)
-    contrast = 255;
-  else if(contrast == 255)
-    contrast = 0;
-  else
-    contrast += 16;
-  sprintf(value_contrast_buffer, "%d", contrast);
+  contrast = (++contrast)%(2*CONTRAST_BLOCKS + 1);
+  Serial.print("Contrast: ");
+  Serial.println(contrast);
+  if(contrast == 2*CONTRAST_BLOCKS) {
+    display.setContrast(255);
+  } else {
+    display.setContrast(256 / (2*CONTRAST_BLOCKS) * contrast);
+  }
+  
+  for(int n=0; n<CONTRAST_BLOCKS; ++n) {
+    value_contrast_buffer[n] =
+      contrast > 2*n+1 ? '\xda' :
+      contrast > 2*n ? '\xdc' :
+      178;
+  }
+  
   set_menu(LABEL_CONTRAST, value_contrast_buffer);
-  display.setContrast(contrast);
 }
 
 #define printhex(n) {if((n)<0x10){Serial.print('0');}Serial.print((n),HEX);}
