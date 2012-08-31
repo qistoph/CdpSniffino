@@ -5,7 +5,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#include "cdp_listener.h" // Uses digital pins 11, 12, 13 on Duemilanove
+#include "cdp_listener.h" // Uses digital pins 10, 11, 12, 13 on Duemilanove
 #include "lcd_control.h"
 #include "lcd_info.h"
 #include "helpers.h"
